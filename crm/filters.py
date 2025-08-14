@@ -1,12 +1,9 @@
 import django_filters
-from django.db.models import Q
 from .models import Customer, Product, Order
 
 class CustomerFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(field_name="name", lookup_expr="icontains")
     email = django_filters.CharFilter(field_name="email", lookup_expr="icontains")
-    created_at__gte = django_filters.DateFilter(field_name="created_at", lookup_expr="gte")
-    created_at__lte = django_filters.DateFilter(field_name="created_at", lookup_expr="lte")
     phone_pattern = django_filters.CharFilter(method="filter_phone_pattern")
 
     def filter_phone_pattern(self, queryset, name, value):
@@ -14,8 +11,7 @@ class CustomerFilter(django_filters.FilterSet):
 
     class Meta:
         model = Customer
-        fields = ["name", "email", "created_at__gte", "created_at__lte", "phone_pattern"]
-
+        fields = ["name", "email", "phone_pattern"]
 
 class ProductFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(field_name="name", lookup_expr="icontains")
@@ -33,7 +29,6 @@ class ProductFilter(django_filters.FilterSet):
     class Meta:
         model = Product
         fields = ["name", "price__gte", "price__lte", "stock__gte", "stock__lte", "low_stock"]
-
 
 class OrderFilter(django_filters.FilterSet):
     total_amount__gte = django_filters.NumberFilter(field_name="total_amount", lookup_expr="gte")
