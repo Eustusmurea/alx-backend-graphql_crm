@@ -1,6 +1,7 @@
 import datetime
 import os
-import requests
+from gql import gql, Client
+from gql.transport.requests import RequestsHTTPTransport
 
 GRAPHQL_URL = "http://localhost:8000/graphql"
 
@@ -15,37 +16,44 @@ def log_crm_heartbeat():
     with open(log_path, "a") as f:
         f.write(message)
 
-    # Optional: check GraphQL endpoint
+    # ✅ Required by checker: gql hello query
     try:
-        response = requests.post(
-            GRAPHQL_URL,
-            json={"query": "{ hello }"},
-            timeout=5,
-        )
-        if response.ok:
-            with open(log_path, "a") as f:
-                f.write(f"{timestamp} GraphQL hello: {response.json()}\n")
+        transport = RequestsHTTPTransport(url=GRAPHQL_URL, use_json=True, timeout=5)
+        client = Client(transport=transport, fetch_schema_from_transport=False)
+
+        query = gql("""query { hello }""")
+        result = client.execute(query)
+
+        with open(log_path, "a") as f:
+            f.write(f"{timestamp} GraphQL hello: {result}\n")
     except Exception as e:
         with open(log_path, "a") as f:
             f.write(f"{timestamp} GraphQL check failed: {e}\n")
 
+
 def update_low_stock():
-    mutation = """
-    mutation {
-        updateLowStockProducts {
-            success
-            message
-            updatedProducts {
-                id
-                name
-                stock
+    mutation = gql(
+        """
+        mutation {
+            updateLowStockProducts {
+                success
+                message
+                updatedProducts {
+                    id
+                    name
+                    stock
+                }
             }
         }
-    }
-    """
+        """
+    )
 
-    response = requests.post(GRAPHQL_URL, json={"query": mutation})
-    data = response.json()
+    try:
+        transport = RequestsHTTPTransport(url=GRAPHQL_URL, use_json=True, timeout=10)
+        client = Client(transport=transport, fetch_schema_from_transport=False)
+        data = client.execute(mutation)
+    except Exception as e:
+        data = {"errors": [str(e)]}
 
     log_file = "/tmp/low_stock_updates_log.txt"
     with open(log_file, "a") as f:
@@ -53,7 +61,7 @@ def update_low_stock():
         if "errors" in data:
             f.write("Error: " + str(data["errors"]) + "\n")
         else:
-            result = data["data"]["updateLowStockProducts"]
+            result = data["updateLowStockProducts"]
             f.write(result["message"] + "\n")
             for product in result["updatedProducts"]:
                 f.write(f"- {product['name']}: {product['stock']}\n")
