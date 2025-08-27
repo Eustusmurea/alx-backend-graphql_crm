@@ -1,0 +1,1 @@
+0 8 * * * /usr/bin/python3 /home/eustus/Desktop/ALX/alx_backend_graphql_crm/crm/cron_jobs/send_order_reminders.py
