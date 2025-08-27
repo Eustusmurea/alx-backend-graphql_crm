@@ -60,7 +60,7 @@ class OrderInput(graphene.InputObjectType):
 # ------------------ Validation Helpers ------------------
 
 def validate_email_unique(email):
-    if CreateCustomer.objects.filter(email=email).exists():
+    if Customer.objects.filter(email=email).exists():  # Fixed: CreateCustomer to Customer
         raise ValidationError("Email already exists.")
 
 def validate_phone_format(phone):
@@ -87,7 +87,7 @@ class CreateCustomer(graphene.Mutation):
         try:
             validate_email_unique(input.email)
             validate_phone_format(input.phone)
-            customer = CreateCustomer.objects.create(
+            customer = Customer.objects.create(  # Fixed: CreateCustomer to Customer
                 name=input.name,
                 email=input.email,
                 phone=input.phone
@@ -100,7 +100,7 @@ class BulkCreateCustomers(graphene.Mutation):
     class Arguments:
         input = graphene.List(CustomerInput, required=True)
 
-    customers = graphene.List(CustomerType)  # Non-Relay list for consistency
+    customers = graphene.List(CustomerType)
     errors = graphene.List(CustomerErrorType)
 
     @staticmethod
@@ -112,7 +112,7 @@ class BulkCreateCustomers(graphene.Mutation):
             try:
                 validate_email_unique(cust.email)
                 validate_phone_format(cust.phone)
-                customer = CreateCustomer.objects.create(
+                customer = Customer.objects.create(  # Fixed: CreateCustomer to Customer
                     name=cust.name,
                     email=cust.email,
                     phone=cust.phone
@@ -157,8 +157,8 @@ class CreateOrder(graphene.Mutation):
                 raise ValidationError("At least one product must be selected.")
 
             try:
-                customer = CreateCustomer.objects.get(id=input.customerId)
-            except CreateCustomer.DoesNotExist:
+                customer = Customer.objects.get(id=input.customerId)  # Fixed: CreateCustomer to Customer
+            except Customer.DoesNotExist:
                 raise ValidationError("Invalid customer ID.")
 
             products = list(Product.objects.filter(id__in=input.productIds))
@@ -179,47 +179,6 @@ class CreateOrder(graphene.Mutation):
         except ValidationError as e:
             raise GraphQLError(str(e))
 
-# ------------------ Root Query & Mutation ------------------
-
-class Query(graphene.ObjectType):
-    allCustomers = DjangoFilterConnectionField(
-        CustomerType,
-        filterset_class=CustomerFilter,
-        name=graphene.String(description="Filter by customer name (case-insensitive)."),
-        order_by=graphene.List(graphene.String, description="Order by fields (e.g., ['name', '-email']).")
-    )
-    allProducts = DjangoFilterConnectionField(
-        ProductType,
-        filterset_class=ProductFilter,
-        name=graphene.String(description="Filter by product name (case-insensitive)."),
-        order_by=graphene.List(graphene.String, description="Order by fields (e.g., ['name', '-price']).")
-    )
-    allOrders = DjangoFilterConnectionField(
-        OrderType,
-        filterset_class=OrderFilter,
-        order_by=graphene.List(graphene.String, description="Order by fields (e.g., ['order_date', '-total_amount']).")
-    )
-
-    def resolve_allCustomers(self, info, **kwargs):
-        qs = CreateCustomer.objects.all()
-        order_by = kwargs.get("order_by")
-        if order_by:
-            qs = qs.order_by(*order_by)
-        return qs
-
-    def resolve_allProducts(self, info, **kwargs):
-        qs = Product.objects.all()
-        order_by = kwargs.get("order_by")
-        if order_by:
-            qs = qs.order_by(*order_by)
-        return qs
-
-    def resolve_allOrders(self, info, **kwargs):
-        qs = Order.objects.all()
-        order_by = kwargs.get("order_by")
-        if order_by:
-            qs = qs.order_by(*order_by)
-        return qs
 class UpdateLowStockProducts(graphene.Mutation):
     class Arguments:
         pass  # no arguments needed
@@ -243,6 +202,53 @@ class UpdateLowStockProducts(graphene.Mutation):
             updated_products=updated
         )
 
+# ------------------ Root Query & Mutation ------------------
+
+class Query(graphene.ObjectType):
+    allCustomers = DjangoFilterConnectionField(
+        CustomerType,
+        filterset_class=CustomerFilter,
+        customer_name=graphene.String(description="Filter by customer name (case-insensitive)."),
+        order_by=graphene.List(graphene.String, description="Order by fields (e.g., ['name', '-email']).")
+    )
+    allProducts = DjangoFilterConnectionField(
+        ProductType,
+        filterset_class=ProductFilter,
+        product_name=graphene.String(description="Filter by product name (case-insensitive)."),
+        order_by=graphene.List(graphene.String, description="Order by fields (e.g., ['name', '-price']).")
+    )
+    allOrders = DjangoFilterConnectionField(
+        OrderType,
+        filterset_class=OrderFilter,
+        order_by=graphene.List(graphene.String, description="Order by fields (e.g., ['order_date', '-total_amount']).")
+    )
+
+    def resolve_allCustomers(self, info, **kwargs):
+        qs = Customer.objects.all()  # Fixed: CreateCustomer to Customer
+        customer_name = kwargs.get("customer_name")
+        if customer_name:
+            qs = qs.filter(name__icontains=customer_name)  # Custom filtering
+        order_by = kwargs.get("order_by")
+        if order_by:
+            qs = qs.order_by(*order_by)
+        return qs
+
+    def resolve_allProducts(self, info, **kwargs):
+        qs = Product.objects.all()
+        product_name = kwargs.get("product_name")
+        if product_name:
+            qs = qs.filter(name__icontains=product_name)  # Custom filtering
+        order_by = kwargs.get("order_by")
+        if order_by:
+            qs = qs.order_by(*order_by)
+        return qs
+
+    def resolve_allOrders(self, info, **kwargs):
+        qs = Order.objects.all()
+        order_by = kwargs.get("order_by")
+        if order_by:
+            qs = qs.order_by(*order_by)
+        return qs
 
 class Mutation(graphene.ObjectType):
     create_customer = CreateCustomer.Field()
