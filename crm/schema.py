@@ -8,7 +8,7 @@ from graphene import relay
 from graphene_django import DjangoObjectType
 from graphql import GraphQLError
 from graphene_django.filter import DjangoFilterConnectionField
-from .models import Customer, Product, Order
+from crm.models import Customer, Product, Order
 from .filters import CustomerFilter, ProductFilter, OrderFilter
 
 # ------------------ GraphQL Types ------------------
